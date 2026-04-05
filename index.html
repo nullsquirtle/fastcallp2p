@@ -1,0 +1,269 @@
+<html lang="ru">
+<head>
+   <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wavos | Звонки </title>
+    <link rel="stylesheet" href="./all.min.css">
+    <link rel="stylesheet" href="./style2.css">
+</head>
+<body>
+    <video id="remoteVideo" autoplay=""></video>   
+    <video id="localVideo" autoplay="" muted=""></video>
+    
+    <div class="container">
+        <header>
+            <h1>WavOS <i class="fas fa-phone-alt"></i></h1>
+            <p class="subtitle"></p>
+            <div class="connection-status status-connected" id="connectionStatus">
+                <span class="status-indicator connecting"></span>
+                <span id="statusText"><span class="status-indicator connected"></span> Подключено к серверу</span>
+            </div>
+            
+            <div class="menu-container">
+                <!-- <button onclick="chatMainOpen()" class="menuButt">Чат</button> -->
+                <button onclick="chatSettingOpen()" class="menuButt"><i class="fas fa-share"></i> <i class="fas fa-copy"></i></button>
+            </div>
+        </header>
+        
+        <div class="main-content" >
+            <div class="panel" id="chatSetting" style="display: none;">
+                <div class="input-group">
+                    <label for="peerId">Ваша ссылка:</label>
+                    <input onclick="funcCopyLink()" type="text" id="peerId" readonly="">
+                </div>
+                <div class="input-group">
+                    <label for="localName">Ваше имя:</label>
+                    <input type="text" id="localName" placeholder="Введите ваше имя">
+                </div>
+                <div class="input-group" style="display:none;">
+                    <label for="remotePeerId">ID собеседника:</label>
+                    <input type="text" id="remotePeerId" placeholder="Введите ID собеседника">
+                </div>
+                <div class="call-info" id="callStatusInfo">
+                    <p id="callStatusText">Готов к звонку</p>
+                </div>
+            </div>
+            
+            <div class="panel" id="chatMain" style="display:none;">
+                <div class="video-container" style="display:none;">
+                    <div class="video-wrapper">
+                        <h3>Вы <span id="localNameDisplay">(dvf&lt;h1&gt;fdd)</span></h3>
+                    </div>
+                    <div class="video-wrapper">
+                        <h3>Собеседник</h3>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="controls">
+                <button class="control-btn" id="toggleAudioBtn" title="Вкл/выкл микрофон">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button class="control-btn" id="toggleVideoBtn" title="Вкл/выкл камеру">
+                    <i class="fas fa-video"></i>
+                </button>
+                <button class="control-btn" id="toggleScreenShareBtn" title="Демонстрация экрана">
+                    <i class="fas fa-desktop"></i>
+                </button>
+            </div>
+            
+            <div class="call-buttons">
+                <button class="btn btn-call" id="callBtn" style="width:150px;height:50px;">
+                    <i class="fas fa-phone"></i> Позвонить
+                </button>
+                <button class="btn btn-end hidden" id="endCallBtn" style="width:210px;height:50px;">
+                    <i class="fas fa-phone-slash"></i> Завершить звонок
+                </button>
+            </div>
+        </div>
+        
+        <div id="incomingCallAlert" class="hidden">
+            <h3><i class="fas fa-phone-volume"></i> Входящий звонок!</h3>
+            <p id="callerInfo">Кто-то звонит вам</p>
+            <div class="alert-buttons">
+                <button class="btn btn-answer" id="answerCallBtn">
+                    <i class="fas fa-phone"></i> Ответить
+                </button>
+                <button class="btn btn-end" id="declineCallBtn">
+                    <i class="fas fa-phone-slash"></i> Отклонить
+                </button>
+            </div>
+        </div>
+<div id="chatWindow" class="hidden">
+    <div class="chat-header">
+        <h3><i class="fas fa-comments"></i> Чат</h3>
+        <button class="close-chat" onclick="toggleChat()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+    </div>
+    <div class="chat-input">
+        <input type="text" id="chatInput" placeholder="Введите сообщение..." onkeypress="handleChatKeyPress(event)">
+        <button id="sendMessageBtn" onclick="sendMessage()"><i class="fas fa-paper-plane"></i></button>
+        <label for="fileUpload" class="file-upload-btn" title="Отправить файл">
+            <i class="fas fa-paperclip"></i>
+        </label>
+        <input type="file" id="fileUpload" style="display: none;">
+    </div>
+</div>
+    </div>
+
+    <script src="/js/peerjs.min.js"></script>
+    <script>
+    var paramsurlcall = new URLSearchParams(window.location.search);
+    
+    if(paramsurlcall.get('setid')) {
+        localStorage.setItem('peerId', paramsurlcall.get('setid'));
+        document.getElementById("remotePeerId").value = paramsurlcall.get('setid');
+    } else if(paramsurlcall.get('id')) {
+        document.getElementById("remotePeerId").value = paramsurlcall.get('id');
+    }
+     
+    if(!paramsurlcall.get('id') && !paramsurlcall.get('setid')){
+        document.getElementById("callBtn").style.display="none";
+    }
+    
+    function funcCopyLink(){
+        var textpeerId = document.getElementById('peerId').value;
+        navigator.clipboard.writeText(textpeerId)
+    }
+    
+    function chatSettingOpen(){
+        var textpeerId = document.getElementById('peerId').value;
+        navigator.clipboard.writeText(textpeerId)
+    }
+    
+    function chatMainOpen(){
+        document.getElementById("chatSetting").style.display="none";
+        document.getElementById("chatMain").style.display="none";
+    }
+    </script>
+    <script src="/js/callmet.js"></script>
+
+    <script>
+
+let screenStream = null;
+let isScreenSharing = false;
+let autoCallAttempted = false;
+let autoAnswerEnabled = false;
+function checkUrlParams() {
+    const params = new URLSearchParams(window.location.search);
+    const runAuto = params.get('run') === 'auto';
+    
+    if (params.get('id') && runAuto) {
+        autoCallAttempted = true;
+    }
+    
+    if (params.get('setid') && runAuto) {
+        autoAnswerEnabled = true;
+       document.getElementById('callBtn').style="display:none";
+    }
+}
+
+function tryAutoCall() {
+    if (!autoCallAttempted || !peer || peer.disconnected) return;
+    
+    const params = new URLSearchParams(window.location.search);
+    const remoteId = params.get('id');
+    
+    if (remoteId && localStream && document.getElementById('callBtn') && 
+        !document.getElementById('callBtn').classList.contains('hidden')) {
+        
+        console.log('Пытаюсь выполнить автоматический звонок на:', remoteId);
+        setTimeout(() => {
+            if (peer && peer.open) {
+                makeCall(remoteId);
+            }
+        }, 1000);
+    }
+}
+
+async function toggleScreenShare() {
+    if (isScreenSharing) {
+        if (screenStream) {
+            screenStream.getTracks().forEach(track => track.stop());
+            screenStream = null;
+        }
+        
+        if (localStream) {
+            const videoTrack = localStream.getVideoTracks()[0];
+            if (currentCall) {
+                const sender = currentCall.peerConnection.getSenders()
+                    .find(s => s.track && s.track.kind === 'video');
+                if (sender && videoTrack) {
+                    sender.replaceTrack(videoTrack);
+                }
+            }
+            localVideo.srcObject = localStream;
+        }
+        
+        isScreenSharing = false;
+        toggleScreenShareBtn.innerHTML = '<i class="fas fa-desktop"></i>';
+        toggleScreenShareBtn.style.backgroundColor = '';
+        console.log('Демонстрация экрана остановлена');
+        
+    } else {
+        try {
+            screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    cursor: "always",
+                    displaySurface: "monitor"
+                },
+                audio: false
+            });
+            
+            if (currentCall) {
+                const sender = currentCall.peerConnection.getSenders()
+                    .find(s => s.track && s.track.kind === 'video');
+                if (sender) {
+                    sender.replaceTrack(screenStream.getVideoTracks()[0]);
+                }
+            }
+            const newStream = new MediaStream([
+                localStream.getAudioTracks()[0], 
+                screenStream.getVideoTracks()[0] 
+            ]);
+            
+            localVideo.srcObject = newStream;
+            isScreenSharing = true;
+            toggleScreenShareBtn.innerHTML = '<i class="fas fa-stop-circle"></i>';
+            toggleScreenShareBtn.style.backgroundColor = '#e74c3c';
+            console.log('Демонстрация экрана начата');
+
+            screenStream.getVideoTracks()[0].onended = () => {
+                toggleScreenShare();
+            };
+            
+        } catch (error) {
+            console.error('Ошибка при демонстрации экрана:', error);
+            alert('Не удалось начать демонстрацию экрана: ' + error.message);
+        }
+    }
+}
+
+function tryAutoAnswer(call) {
+    if (!autoAnswerEnabled) return false;
+    
+    console.log('Пытаюсь автоматически ответить на звонок от:', call.peer);
+
+    setTimeout(() => {
+        if (incomingCall && localStream) {
+            console.log('Автоматически отвечаю на звонок');
+            answerCall();
+        }
+    }, 500);
+    
+    return true;
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    checkUrlParams();
+    document.getElementById('toggleScreenShareBtn').addEventListener('click', toggleScreenShare);
+    setTimeout(() => {
+        if (autoCallAttempted) {
+            tryAutoCall();
+        }
+    }, 2000);
+});
+    </script>
+</body>
+</html>
