@@ -20,9 +20,9 @@ chmod +x p2serv.bash
 ## 🛠 Требования
 * Node.js
 * PM2 (npm install pm2 -g)
-* PeerJS (npm install peer -g)
+* PeerJS (npm install peerjs -g)
 
-## Функции
+## 🌟 Функции
 * Видео\аудио чат
 * Мессенджер
 * Демонстрация экрана
