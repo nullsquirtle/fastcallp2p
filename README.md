@@ -29,3 +29,5 @@ chmod +x p2serv.bash
 * Обменник файлов
 
 ![Preview](./изображение.png)
+
+## Лицензия: MIT
